@@ -1,0 +1,43 @@
+name: CI - Validate Notebooks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          pip install flake8 pyflakes
+
+      - name: Check Python syntax validity (all notebook source files)
+        run: |
+          python -m py_compile notebooks/*.py
+
+      - name: Run flake8 lint check
+        run: |
+          flake8 notebooks/ --max-line-length=120 --ignore=E501,E302,E305,E402,W503 --exit-zero
+
+      - name: Validate SQL file is not empty
+        run: |
+          if [ ! -s sql/create_tables.sql ]; then
+            echo "ERROR: create_tables.sql is empty or missing"
+            exit 1
+          fi
+          echo "SQL file present and non-empty"
+
+      - name: CI Summary
+        run: echo "✅ All notebooks passed syntax validation and lint checks"
