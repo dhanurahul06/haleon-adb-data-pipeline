@@ -74,3 +74,66 @@ if max_date is not None:
     print(f"Watermark updated to {max_date}")
 else:
     print("No new rows - watermark unchanged")
+
+# COMMAND ----------
+
+# Retrieve credentials with error handling
+try:
+    sql_username = dbutils.secrets.get(scope="kv-dev-scope", key="sql-dev-username")
+    sql_password = dbutils.secrets.get(scope="kv-dev-scope", key="sql-dev-password")
+    print("Credentials retrieved successfully")
+except Exception as e:
+    print(f"ERROR: Failed to retrieve credentials from Key Vault: {e}")
+    raise
+
+# COMMAND ----------
+
+# JDBC connection + read with error handling
+jdbc_hostname = "rahul-de-sql-dev.database.windows.net"
+jdbc_database = "pharma-sales-dev"
+jdbc_port = 1433
+jdbc_url = f"jdbc:sqlserver://{jdbc_hostname}:{jdbc_port};database={jdbc_database}"
+connection_properties = {
+    "user": sql_username,
+    "password": sql_password,
+    "driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+}
+
+try:
+    df = spark.read.jdbc(url=jdbc_url, table="PharmaSalesDaily", properties=connection_properties)
+    row_count = df.count()
+    print(f"Successfully read {row_count} rows from source")
+except Exception as e:
+    print(f"ERROR: Failed to read from SQL Database: {e}")
+    raise
+
+# COMMAND ----------
+
+# Write to Bronze with error handling
+try:
+    spark.sql("CREATE SCHEMA IF NOT EXISTS rahul_de_databricks_dev.bronze")
+    df.write.mode("overwrite").saveAsTable("rahul_de_databricks_dev.bronze.pharma_sales_raw")
+    print("Bronze table written successfully")
+except Exception as e:
+    print(f"ERROR: Failed to write Bronze table: {e}")
+    raise
+
+# COMMAND ----------
+
+import time
+
+max_retries = 3
+for attempt in range(1, max_retries + 1):
+    try:
+        df = spark.read.jdbc(url=jdbc_url, table="PharmaSalesDaily", properties=connection_properties)
+        row_count = df.count()
+        print(f"Successfully read {row_count} rows from source")
+        break
+    except Exception as e:
+        print(f"Attempt {attempt} failed: {e}")
+        if attempt < max_retries:
+            print("Retrying in 30 seconds (database may be waking up)...")
+            time.sleep(30)
+        else:
+            print("ERROR: All retry attempts failed")
+            raise
