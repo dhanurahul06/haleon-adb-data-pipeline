@@ -129,6 +129,23 @@ guidance, it was rebuilt to run entirely within Databricks:
 
 ---
 
+---
+
+## Reliability — Exception Handling & Alerting
+
+- **Exception handling:** every major step across all three notebooks
+  (credential retrieval, JDBC reads, table writes) is wrapped in try/except
+  blocks with specific, readable error messages — replacing raw Spark/JVM
+  stack traces with actionable diagnostics. The Bronze ingestion read
+  includes a retry loop (3 attempts, 30s backoff) specifically to handle
+  Azure SQL Database's serverless auto-pause behavior, which was hit and
+  confirmed working during testing — a transient "database is not currently
+  available" error was caught, retried automatically, and succeeded on the
+  next attempt.
+- **Email alerting:** the Databricks Workflow (`pharma-sales-pipeline-dev`)
+  has notifications configured for both job success and job failure,
+  verified with a real test run and a received confirmation email.
+
 ## Repository Structure
 
 ```
@@ -177,6 +194,7 @@ superseded by this ADB-only architecture per mentor guidance.
 **Rahul Varma** — Final Year B.Tech Information Technology, MIT Manipal
 ITR Project | Data Architecture & Engineering Department
 [LinkedIn](https://www.linkedin.com/in/dhanunjay-rahul-varma-646893270/) 
+
 ---
 
 *Project built iteratively with real troubleshooting throughout — including
